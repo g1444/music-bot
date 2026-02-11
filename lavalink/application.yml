@@ -1,0 +1,44 @@
+server:
+  port: 2333
+  address: 0.0.0.0
+
+lavalink:
+  server:
+    password: "youshallnotpass"
+
+    # Disable broken default YouTube
+    sources:
+      youtube: false
+      bandcamp: true
+      soundcloud: true
+      local: false
+      http: true
+
+    bufferDurationMs: 400
+    frameBufferDurationMs: 5000
+    playerUpdateInterval: 5
+    gc-warnings: true
+
+    # Search handled by plugin
+    youtubeSearchEnabled: false
+    soundcloudSearchEnabled: true
+
+plugins:
+  youtube:
+    enabled: true
+    allowSearch: true
+    allowDirectVideoIds: true
+    allowDirectPlaylistIds: true
+
+metrics:
+  prometheus:
+    enabled: false
+
+sentry:
+  dsn: ""
+  environment: ""
+
+logging:
+  level:
+    root: INFO
+    lavalink: INFO
