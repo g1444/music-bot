@@ -7,15 +7,18 @@ import asyncio
 
 load_dotenv()
 
-# Load opus DLL with full path
-if not discord.opus.is_loaded():
-    try:
-        discord.opus.load_opus('G:/codes/discord/music bot/opus.dll')
-    except:
-        pass
+# ✅ Load Opus safely
+try:
+    discord.opus.load_opus(os.path.abspath("opus.dll"))
+except Exception as e:
+    print("Opus load error:", e)
+
+print("Opus loaded:", discord.opus.is_loaded())
 
 intents = discord.Intents.default()
 intents.message_content = True
+intents.voice_states = True
+intents.guilds = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -30,62 +33,78 @@ async def on_ready():
     print(f"✅ Logged in as {bot.user}")
 
     node = wavelink.Node(
-        uri="http://127.0.0.1:2333",
+        uri="127.0.0.1:2333",
         password="youshallnotpass"
     )
 
-    await wavelink.NodePool.connect(
-        client=bot,
-        nodes=[node]
-    )
+    await wavelink.NodePool.connect(client=bot, nodes=[node])
 
     lavalink_connected = True
     print("🎵 Lavalink connected successfully")
 
-@bot.event
-async def on_wavelink_track_start(player: wavelink.Player, track: wavelink.tracks):
-    print(f"🎵 Track STARTED: {track.title}")
 
-@bot.event  
-async def on_wavelink_track_end(player: wavelink.Player, track: wavelink.tracks, reason):
-    print(f"⏹️ Track ENDED: {track.title} | Reason: {reason}")
-
+# ✅ MUSIC COMMAND (LAVALINK)
 @bot.command()
 async def play(ctx, *, search: str):
+    if not ctx.author.voice:
+        await ctx.send("Join VC 😤")
+        return
+
+    vc: wavelink.Player = ctx.voice_client
+
+    if not vc:
+        vc = await ctx.author.voice.channel.connect(cls=wavelink.Player)
+
+    await asyncio.sleep(1)
+
+    tracks = await wavelink.YouTubeTrack.search(search)
+    if not tracks:
+        await ctx.send("No results 😑")
+        return
+
+    track = tracks[0]
+
+    await vc.set_volume(150)
+    await vc.play(track)
+
+    print("Player:", vc)
+    print("Connected:", vc.is_connected())
+    print("Playing:", vc.is_playing())
+
+    await ctx.send(f"🎶 Now playing: {track.title}")
+
+
+
+# ✅ RAW DISCORD AUDIO TEST (NO LAVALINK)
+@bot.command()
+async def testvoice(ctx):
     if not ctx.author.voice:
         await ctx.send("Join a voice channel first 😤")
         return
 
-    # Always disconnect and reconnect fresh
     if ctx.voice_client:
         await ctx.voice_client.disconnect(force=True)
         await asyncio.sleep(1)
 
-    vc = await ctx.author.voice.channel.connect(cls=wavelink.Player)
-    await asyncio.sleep(2)  # Give it time to establish connection
+    vc = await ctx.author.voice.channel.connect()
 
-    tracks = await wavelink.YouTubeTrack.search(search)
-    if not tracks:
-        await ctx.send("No results found 😐")
-        return
+    source = discord.FFmpegPCMAudio(
+        executable=os.path.abspath("ffmpeg.exe"),
+        source="anullsrc",  # 🔥 Generates silent audio internally
+        before_options="-f lavfi",
+        options="-t 5"
+    )
 
-    track = tracks[0]
-    
-    # Play BEFORE setting volume
-    await vc.play(track)
-    await asyncio.sleep(0.5)
-    await vc.set_volume(200)  # Try higher volume
+    vc.play(source)
 
-    await ctx.send(f"🎶 Now playing: **{track.title}**")
+    await ctx.send("🎧 Testing voice transport...")
 
-    print("▶ is_playing:", vc.is_playing())
-    print("🔊 volume:", vc.volume)
-    print("🎵 Current track:", vc.current)
 
 @bot.command()
 async def stop(ctx):
     if ctx.voice_client:
         await ctx.voice_client.disconnect()
-        await ctx.send("Stopped!")
+        await ctx.send("Stopped! 👋")
+
 
 bot.run(os.getenv("DISCORD_TOKEN"))
