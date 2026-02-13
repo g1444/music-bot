@@ -7,7 +7,7 @@ import asyncio
 
 load_dotenv()
 
-# ✅ Load Opus safely
+# ✅ Opus (optional but safe)
 try:
     discord.opus.load_opus(os.path.abspath("opus.dll"))
 except Exception as e:
@@ -32,18 +32,19 @@ async def on_ready():
 
     print(f"✅ Logged in as {bot.user}")
 
+    # 🔥 PUBLIC LAVALINK NODE
     node = wavelink.Node(
-        uri="127.0.0.1:2333",
-        password="youshallnotpass"
+        uri="lavalink.serenetia.com:443",
+        password="https://dsc.gg/ajidevserver",
+        secure=True
     )
 
     await wavelink.NodePool.connect(client=bot, nodes=[node])
 
     lavalink_connected = True
-    print("🎵 Lavalink connected successfully")
+    print("🎵 Public Lavalink connected successfully")
 
 
-# ✅ MUSIC COMMAND (LAVALINK)
 @bot.command()
 async def play(ctx, *, search: str):
     if not ctx.author.voice:
@@ -67,38 +68,43 @@ async def play(ctx, *, search: str):
     await vc.set_volume(150)
     await vc.play(track)
 
-    print("Player:", vc)
     print("Connected:", vc.is_connected())
     print("Playing:", vc.is_playing())
 
     await ctx.send(f"🎶 Now playing: {track.title}")
-
-
-
-# ✅ RAW DISCORD AUDIO TEST (NO LAVALINK)
 @bot.command()
-async def testvoice(ctx):
+async def playlist(ctx, url: str):
     if not ctx.author.voice:
-        await ctx.send("Join a voice channel first 😤")
+        await ctx.send("Join VC first 😤")
         return
 
-    if ctx.voice_client:
-        await ctx.voice_client.disconnect(force=True)
-        await asyncio.sleep(1)
+    vc: wavelink.Player = ctx.voice_client
+    if not vc:
+        vc = await ctx.author.voice.channel.connect(cls=wavelink.Player)
 
-    vc = await ctx.author.voice.channel.connect()
+    await ctx.send("Reading playlist… ⏳")
 
-    source = discord.FFmpegPCMAudio(
-        executable=os.path.abspath("ffmpeg.exe"),
-        source="anullsrc",  # 🔥 Generates silent audio internally
-        before_options="-f lavfi",
-        options="-t 5"
-    )
+    result = await wavelink.YouTubeTrack.search(url)
 
-    vc.play(source)
+    if not result:
+        await ctx.send("Failed to load playlist 😑")
+        return
 
-    await ctx.send("🎧 Testing voice transport...")
+    # ✅ THIS is the missing logic
+    if hasattr(result, "tracks"):
+        tracks = result.tracks
+    else:
+        tracks = result
 
+    count = 0
+    for track in tracks:
+        await vc.queue.put_wait(track)
+        count += 1
+
+    await ctx.send(f"Queued {count} tracks 😏")
+
+    if not vc.is_playing():
+        await vc.play(await vc.queue.get_wait())
 
 @bot.command()
 async def stop(ctx):
